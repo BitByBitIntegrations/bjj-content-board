@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BJJ Content Board</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f0f;
+      --surface: #1a1a1a;
+      --surface2: #222;
+      --border: #2e2e2e;
+      --text: #e8e8e8;
+      --muted: #666;
+      --accent: #c8a84b;
+      --accent-dim: rgba(200,168,75,0.15);
+      --danger: #b04040;
+      --tag-brainrot: #7c3aed;
+      --tag-training: #2563eb;
+      --tag-comp: #c8a84b;
+      --tag-highlight: #059669;
+      --radius: 8px;
+      --card-w: 280px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    header h1 {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: .3px;
+    }
+
+    header .subtitle {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      margin-left: auto;
+      transition: background .3s;
+    }
+    .status-dot.live { background: #22c55e; }
+
+    /* Add bar */
+    .add-bar {
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+    }
+
+    .add-bar input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 8px 12px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .add-bar input:focus { border-color: var(--accent); }
+    .add-bar input::placeholder { color: var(--muted); }
+
+    .add-bar select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: 13px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .btn {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: var(--radius);
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn:disabled { opacity: .4; cursor: default; }
+
+    /* Board */
+    .board {
+      display: flex;
+      gap: 16px;
+      padding: 20px 24px;
+      overflow-x: auto;
+      flex: 1;
+      align-items: flex-start;
+    }
+
+    .column {
+      flex-shrink: 0;
+      width: var(--card-w);
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .col-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 4px 10px;
+    }
+    .col-header h2 {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: var(--muted);
+    }
+    .col-count {
+      font-size: 11px;
+      background: var(--surface2);
+      color: var(--muted);
+      border-radius: 99px;
+      padding: 1px 7px;
+    }
+
+    .card-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 60px;
+      padding: 4px;
+      border-radius: var(--radius);
+      transition: background .15s;
+    }
+    .card-list.drag-over { background: var(--accent-dim); }
+
+    /* Card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      cursor: grab;
+      user-select: none;
+      transition: border-color .15s, box-shadow .15s;
+      position: relative;
+    }
+    .card:hover { border-color: #444; }
+    .card.dragging { opacity: .4; cursor: grabbing; }
+
+    .card-label {
+      font-weight: 500;
+      line-height: 1.35;
+      margin-bottom: 4px;
+      word-break: break-word;
+    }
+
+    .card-desc {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+      margin-bottom: 6px;
+      word-break: break-word;
+    }
+
+    .card-link {
+      display: block;
+      color: var(--accent);
+      font-size: 12px;
+      text-decoration: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 8px;
+    }
+    .card-link:hover { text-decoration: underline; }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .tag {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      padding: 2px 7px;
+      border-radius: 99px;
+    }
+    .tag-brainrot  { background: rgba(124,58,237,.2); color: #a78bfa; }
+    .tag-training  { background: rgba(37,99,235,.2);  color: #60a5fa; }
+    .tag-comp      { background: rgba(200,168,75,.2); color: var(--accent); }
+    .tag-highlight { background: rgba(5,150,105,.2);  color: #34d399; }
+
+    .card-date {
+      font-size: 11px;
+      color: var(--muted);
+      margin-left: auto;
+    }
+
+    .card-actions {
+      display: none;
+      gap: 4px;
+      position: absolute;
+      top: 8px;
+      right: 8px;
+    }
+    .card:hover .card-actions { display: flex; }
+
+    .icon-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 4px;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 12px;
+      transition: color .15s, border-color .15s;
+    }
+    .icon-btn:hover { color: var(--text); border-color: #555; }
+    .icon-btn.danger:hover { color: #f87171; border-color: var(--danger); }
+
+    /* Modal */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.6);
+      backdrop-filter: blur(2px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .overlay.open { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .modal h3 { font-size: 15px; font-weight: 600; }
+
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field label { font-size: 12px; color: var(--muted); font-weight: 500; }
+
+    .field input, .field textarea, .field select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .field input:focus, .field textarea:focus, .field select:focus { border-color: var(--accent); }
+    .field textarea { resize: vertical; min-height: 70px; }
+
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--muted);
+      padding: 8px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: color .15s, border-color .15s;
+    }
+    .btn-ghost:hover { color: var(--text); border-color: #555; }
+
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      padding: 24px 0;
+    }
+
+    @media (max-width: 640px) {
+      .board { padding: 12px; }
+      .add-bar { padding: 10px 12px; flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>BJJ Content Board</h1>
+    <div class="subtitle">Imagined → Filmed → Edited → Shared</div>
+  </div>
+  <span class="status-dot" id="statusDot" title="Connecting…"></span>
+</header>
+
+<div class="add-bar">
+  <input id="quickInput" type="text" placeholder="Paste a link or type an idea…" />
+  <select id="quickTag">
+    <option value="brainrot">Brainrot</option>
+    <option value="training">Training Film</option>
+    <option value="comp">Comp Matches</option>
+    <option value="highlight">Highlights</option>
+  </select>
+  <button class="btn" id="addBtn" onclick="quickAdd()">Add</button>
+</div>
+
+<div class="board" id="board"></div>
+
+<!-- Edit modal -->
+<div class="overlay" id="overlay" onclick="closeModal(event)">
+  <div class="modal">
+    <h3 id="modalTitle">Edit card</h3>
+    <div class="field">
+      <label>Label</label>
+      <input id="editLabel" type="text" />
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <textarea id="editDesc"></textarea>
+    </div>
+    <div class="field">
+      <label>Link</label>
+      <input id="editLink" type="url" placeholder="https://…" />
+    </div>
+    <div class="field">
+      <label>Tag</label>
+      <select id="editTag">
+        <option value="brainrot">Brainrot</option>
+        <option value="training">Training Film</option>
+        <option value="comp">Comp Matches</option>
+        <option value="highlight">Highlights</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Stage</label>
+      <select id="editStage">
+        <option value="imagined">Imagined</option>
+        <option value="filmed">Filmed</option>
+        <option value="edited">Edited</option>
+        <option value="shared">Shared</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="saveEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Config ──────────────────────────────────────────────────────────────────
+const SUPABASE_URL  = 'https://abusswpafdzmiznrlcdz.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFidXNzd3BhZmR6bWl6bnJsY2R6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwNDMyMDgsImV4cCI6MjA5NzYxOTIwOH0.uXkWcnLFlNnGV0ZkZBciwrWke8nwZWxfQKdRIisjyPo';
+
+const STAGES = [
+  { key: 'imagined', label: 'Imagined' },
+  { key: 'filmed',   label: 'Filmed'   },
+  { key: 'edited',   label: 'Edited'   },
+  { key: 'shared',   label: 'Shared'   },
+];
+
+const TAG_LABELS = {
+  brainrot:  'Brainrot',
+  training:  'Training Film',
+  comp:      'Comp Matches',
+  highlight: 'Highlights',
+};
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let db = null;
+let cards = [];          // flat array, sorted by stage+position
+let dragId = null;
+let editingId = null;
+
+// ─── Supabase ────────────────────────────────────────────────────────────────
+const configured = SUPABASE_URL !== '__SUPABASE_URL__';
+
+if (configured) {
+  db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  load();
+  subscribe();
+} else {
+  // Dev fallback: localStorage
+  cards = JSON.parse(localStorage.getItem('bjj-cards') || '[]');
+  render();
+  console.warn('Supabase not configured — using localStorage. Replace __SUPABASE_URL__ and __SUPABASE_ANON_KEY__ to connect.');
+}
+
+async function load() {
+  const { data, error } = await db
+    .from('cards')
+    .select('*')
+    .order('stage')
+    .order('position');
+  if (error) { console.error(error); return; }
+  cards = data;
+  render();
+}
+
+function subscribe() {
+  db.channel('cards-realtime')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'cards' }, () => load())
+    .subscribe(status => {
+      document.getElementById('statusDot').className =
+        'status-dot' + (status === 'SUBSCRIBED' ? ' live' : '');
+    });
+}
+
+function localSave() {
+  if (!configured) localStorage.setItem('bjj-cards', JSON.stringify(cards));
+}
+
+// ─── Quick add ───────────────────────────────────────────────────────────────
+async function quickAdd() {
+  const input = document.getElementById('quickInput');
+  const tag   = document.getElementById('quickTag').value;
+  const raw   = input.value.trim();
+  if (!raw) return;
+
+  const isURL = /^https?:\/\//i.test(raw);
+  const card  = {
+    label:       isURL ? raw : raw,
+    description: null,
+    link:        isURL ? raw : null,
+    tag,
+    stage:       'imagined',
+    position:    nextPosition('imagined'),
+  };
+
+  if (isURL) {
+    // Attempt to pull a title via allorigins proxy (best-effort)
+    try {
+      const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(raw)}`);
+      const j = await r.json();
+      const m = j.contents.match(/<title[^>]*>([^<]+)<\/title>/i);
+      if (m) card.label = m[1].trim().slice(0, 120);
+    } catch (_) { /* ignore */ }
+  }
+
+  input.value = '';
+
+  if (configured) {
+    const { data, error } = await db.from('cards').insert(card).select().single();
+    if (error) { console.error(error); return; }
+    cards.push(data);
+  } else {
+    card.id = crypto.randomUUID();
+    card.created_at = new Date().toISOString();
+    cards.push(card);
+    localSave();
+  }
+  render();
+}
+
+document.getElementById('quickInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') quickAdd();
+});
+
+function nextPosition(stage) {
+  const col = cards.filter(c => c.stage === stage);
+  return col.length ? Math.max(...col.map(c => c.position)) + 1 : 0;
+}
+
+// ─── Delete ──────────────────────────────────────────────────────────────────
+async function deleteCard(id) {
+  if (!confirm('Delete this card?')) return;
+  if (configured) {
+    await db.from('cards').delete().eq('id', id);
+  }
+  cards = cards.filter(c => c.id !== id);
+  localSave();
+  render();
+}
+
+// ─── Edit modal ──────────────────────────────────────────────────────────────
+function openEdit(id) {
+  editingId = id;
+  const c = cards.find(c => c.id === id);
+  document.getElementById('editLabel').value = c.label || '';
+  document.getElementById('editDesc').value  = c.description || '';
+  document.getElementById('editLink').value  = c.link || '';
+  document.getElementById('editTag').value   = c.tag;
+  document.getElementById('editStage').value = c.stage;
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('editLabel').focus();
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('overlay')) return;
+  document.getElementById('overlay').classList.remove('open');
+  editingId = null;
+}
+
+async function saveEdit() {
+  const patch = {
+    label:       document.getElementById('editLabel').value.trim(),
+    description: document.getElementById('editDesc').value.trim() || null,
+    link:        document.getElementById('editLink').value.trim() || null,
+    tag:         document.getElementById('editTag').value,
+    stage:       document.getElementById('editStage').value,
+  };
+  if (!patch.label) return;
+
+  if (configured) {
+    const { error } = await db.from('cards').update(patch).eq('id', editingId);
+    if (error) { console.error(error); return; }
+  }
+  cards = cards.map(c => c.id === editingId ? { ...c, ...patch } : c);
+  localSave();
+  document.getElementById('overlay').classList.remove('open');
+  editingId = null;
+  render();
+}
+
+// ─── Drag & drop ─────────────────────────────────────────────────────────────
+function onDragStart(e, id) {
+  dragId = id;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function onDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.card-list').forEach(l => l.classList.remove('drag-over'));
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+
+function onDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+async function onDrop(e, stage) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (!dragId) return;
+
+  const card = cards.find(c => c.id === dragId);
+  if (!card || card.stage === stage) return;
+
+  const oldStage = card.stage;
+  card.stage    = stage;
+  card.position = nextPosition(stage);
+
+  if (configured) {
+    await db.from('cards').update({ stage, position: card.position }).eq('id', dragId);
+    // Reorder old column
+    const oldCol = cards.filter(c => c.stage === oldStage).sort((a,b) => a.position - b.position);
+    await Promise.all(oldCol.map((c, i) =>
+      i !== c.position ? db.from('cards').update({ position: i }).eq('id', c.id) : Promise.resolve()
+    ));
+  } else {
+    localSave();
+  }
+  render();
+}
+
+// ─── Render ──────────────────────────────────────────────────────────────────
+function fmt(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function render() {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+
+  for (const stage of STAGES) {
+    const col     = document.createElement('div');
+    col.className = 'column';
+
+    const stageCards = cards
+      .filter(c => c.stage === stage.key)
+      .sort((a, b) => a.position - b.position);
+
+    col.innerHTML = `
+      <div class="col-header">
+        <h2>${stage.label}</h2>
+        <span class="col-count">${stageCards.length}</span>
+      </div>
+    `;
+
+    const list = document.createElement('div');
+    list.className = 'card-list';
+    list.dataset.stage = stage.key;
+    list.addEventListener('dragover',  onDragOver);
+    list.addEventListener('dragleave', onDragLeave);
+    list.addEventListener('drop',      e => onDrop(e, stage.key));
+
+    if (stageCards.length === 0) {
+      list.innerHTML = '<div class="empty">Drop here</div>';
+    } else {
+      for (const c of stageCards) {
+        const el = document.createElement('div');
+        el.className  = 'card';
+        el.draggable  = true;
+        el.dataset.id = c.id;
+        el.addEventListener('dragstart', e => onDragStart(e, c.id));
+        el.addEventListener('dragend',   onDragEnd);
+
+        el.innerHTML = `
+          <div class="card-actions">
+            <button class="icon-btn" onclick="openEdit('${c.id}')" title="Edit">✎</button>
+            <button class="icon-btn danger" onclick="deleteCard('${c.id}')" title="Delete">✕</button>
+          </div>
+          <div class="card-label">${esc(c.label)}</div>
+          ${c.description ? `<div class="card-desc">${esc(c.description)}</div>` : ''}
+          ${c.link ? `<a class="card-link" href="${esc(c.link)}" target="_blank" rel="noopener">${esc(c.link)}</a>` : ''}
+          <div class="card-footer">
+            <span class="tag tag-${c.tag}">${TAG_LABELS[c.tag] || c.tag}</span>
+            <span class="card-date">${fmt(c.created_at)}</span>
+          </div>
+        `;
+        list.appendChild(el);
+      }
+    }
+
+    col.appendChild(list);
+    board.appendChild(col);
+  }
+}
+
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
