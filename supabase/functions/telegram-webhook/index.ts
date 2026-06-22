@@ -4,26 +4,54 @@ const TELEGRAM_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN')!;
 const SUPABASE_URL   = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_KEY   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-const URL_RE = /https?:\/\/[^\s]+/i;
+const URL_RE  = /https?:\/\/[^\s]+/i;
+const TAG_MAP: Record<string, string> = {
+  brainrot:  'brainrot',
+  training:  'training',
+  comp:      'comp',
+  highlight: 'highlight',
+  highlights:'highlight',
+  educational:'training',
+};
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('ok', { status: 200 });
 
   const body = await req.json().catch(() => null);
-  const text = body?.message?.text as string | undefined;
-  if (!text) return new Response('no text', { status: 200 });
+  const text = (body?.message?.text ?? '') as string;
 
+  // Ignore bot commands like /start
+  if (!text || text.startsWith('/')) return new Response('ok', { status: 200 });
+
+  // Extract URL
   const urlMatch = text.match(URL_RE);
   const link     = urlMatch?.[0] ?? null;
-  const label    = link ? text.replace(link, '').trim() || await fetchTitle(link) : text;
+  const cleaned  = text.replace(URL_RE, '').trim();
+
+  // Extract tag from #hashtags
+  const tagMatch = cleaned.match(/#(\w+)/i);
+  const tagRaw   = tagMatch?.[1]?.toLowerCase() ?? 'brainrot';
+  const tag      = TAG_MAP[tagRaw] ?? 'brainrot';
+  const noTags   = cleaned.replace(/#\w+/gi, '').trim();
+
+  // First line = label, rest = description
+  const lines       = noTags.split('\n').map(l => l.trim()).filter(Boolean);
+  let label         = lines[0] ?? link ?? 'Untitled';
+  let description   = lines.slice(1).join('\n').trim() || null;
+
+  // If we only got a URL and no text, fetch the page title
+  if (link && !lines.length) {
+    label = await fetchTitle(link);
+  }
 
   const db = createClient(SUPABASE_URL, SUPABASE_KEY);
   const { error } = await db.from('cards').insert({
-    label:    label.slice(0, 200),
+    label:       label.slice(0, 200),
+    description: description?.slice(0, 1000) ?? null,
     link,
-    tag:      'brainrot',
-    stage:    'imagined',
-    position: 0,
+    tag,
+    stage:       'imagined',
+    position:    0,
   });
 
   if (error) {
