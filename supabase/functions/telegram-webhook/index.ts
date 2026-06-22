@@ -244,7 +244,7 @@ Deno.serve(async (req) => {
   }
 
   label       = label.slice(0, 200);
-  description = description?.slice(0, 1000) ?? null;
+  description = description?.slice(0, 5000) ?? null;
 
   if (chatId) {
     // Store as draft and ask for confirmation
