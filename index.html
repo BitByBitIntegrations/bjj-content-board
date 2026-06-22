@@ -221,10 +221,11 @@
       padding: 2px 7px;
       border-radius: 99px;
     }
-    .tag-brainrot  { background: rgba(124,58,237,.2); color: #a78bfa; }
-    .tag-training  { background: rgba(37,99,235,.2);  color: #60a5fa; }
-    .tag-comp      { background: rgba(200,168,75,.2); color: var(--accent); }
-    .tag-highlight { background: rgba(5,150,105,.2);  color: #34d399; }
+    .tag-brainrot   { background: rgba(124,58,237,.2); color: #a78bfa; }
+    .tag-training   { background: rgba(37,99,235,.2);  color: #60a5fa; }
+    .tag-comp       { background: rgba(200,168,75,.2); color: var(--accent); }
+    .tag-highlight  { background: rgba(5,150,105,.2);  color: #34d399; }
+    .tag-education  { background: rgba(6,182,212,.2);  color: #22d3ee; }
 
     .card-date {
       font-size: 11px;
@@ -346,6 +347,7 @@
     <option value="training">Training Film</option>
     <option value="comp">Comp Matches</option>
     <option value="highlight">Highlights</option>
+    <option value="education">Education</option>
   </select>
   <button class="btn" id="addBtn" onclick="quickAdd()">Add</button>
 </div>
@@ -383,6 +385,7 @@
         <option value="training">Training Film</option>
         <option value="comp">Comp Matches</option>
         <option value="highlight">Highlights</option>
+        <option value="education">Education</option>
       </select>
     </div>
     <div class="field">
@@ -414,10 +417,11 @@ const STAGES = [
 ];
 
 const TAG_LABELS = {
-  brainrot:  'Brainrot',
-  training:  'Training Film',
-  comp:      'Comp Matches',
-  highlight: 'Highlights',
+  brainrot:   'Brainrot',
+  training:   'Training Film',
+  comp:       'Comp Matches',
+  highlight:  'Highlights',
+  education:  'Education',
 };
 
 // ─── State ───────────────────────────────────────────────────────────────────

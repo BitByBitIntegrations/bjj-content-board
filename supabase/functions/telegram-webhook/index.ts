@@ -35,25 +35,30 @@ const TAG_MAP: Record<string, string> = {
   competition:  'comp',
   highlight:    'highlight',
   highlights:   'highlight',
-  educational:  'training',
+  educational:  'education',
+  education:    'education',
 };
 
 // Keyword lists for smart tag guessing (case-insensitive)
-const HIGHLIGHT_KEYWORDS = ['highlight', 'highlights', 'compilation', 'best of', 'montage'];
-const TRAINING_KEYWORDS  = [
+const HIGHLIGHT_KEYWORDS  = ['highlight', 'highlights', 'compilation', 'best of', 'montage'];
+const EDUCATION_KEYWORDS  = [
+  'educational', 'education', 'lesson', 'concept', 'theory', 'explain',
+];
+const TRAINING_KEYWORDS   = [
   'training', 'drill', 'technique', 'instructional', 'how to', 'tutorial',
-  'educational', 'purple belt', 'blue belt', 'white belt', 'guard', 'sweep',
+  'purple belt', 'blue belt', 'white belt', 'guard', 'sweep',
   'pass', 'submission', 'kimura', 'armbar', 'triangle', 'choke',
 ];
-const COMP_KEYWORDS     = ['comp', 'competition', 'match', 'tournament', 'fight', 'bracket', 'medal'];
-const BRAINROT_KEYWORDS = ['meme', 'funny', 'viral', 'brainrot'];
+const COMP_KEYWORDS      = ['comp', 'competition', 'match', 'tournament', 'fight', 'bracket', 'medal'];
+const BRAINROT_KEYWORDS  = ['meme', 'funny', 'viral', 'brainrot'];
 
 function guessTagFromKeywords(text: string): string {
   const lower = text.toLowerCase();
-  if (HIGHLIGHT_KEYWORDS.some(k => lower.includes(k))) return 'highlight';
-  if (TRAINING_KEYWORDS.some(k => lower.includes(k)))  return 'training';
-  if (COMP_KEYWORDS.some(k => lower.includes(k)))      return 'comp';
-  if (BRAINROT_KEYWORDS.some(k => lower.includes(k)))  return 'brainrot';
+  if (HIGHLIGHT_KEYWORDS.some(k => lower.includes(k)))  return 'highlight';
+  if (EDUCATION_KEYWORDS.some(k => lower.includes(k)))  return 'education';
+  if (TRAINING_KEYWORDS.some(k => lower.includes(k)))   return 'training';
+  if (COMP_KEYWORDS.some(k => lower.includes(k)))       return 'comp';
+  if (BRAINROT_KEYWORDS.some(k => lower.includes(k)))   return 'brainrot';
   return 'brainrot';
 }
 
