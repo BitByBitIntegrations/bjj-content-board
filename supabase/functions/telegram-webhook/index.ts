@@ -70,6 +70,69 @@ async function sendTelegram(chatId: number, message: string): Promise<void> {
   });
 }
 
+// ── Flexible command matching helpers ─────────────────────────────────────────
+
+const RECENCY_WORDS = ['last', 'latest', 'previous', 'most recent', 'newest', 'recent'];
+const ITEM_WORDS    = ['card', 'item', 'idea', 'thing', 'content', 'post', 'video', 'note', 'one'];
+
+/**
+ * Returns true if `text` contains any of the given verbs followed (anywhere
+ * after it) by any recency word and any item word, in that left-to-right order.
+ * Extra words (e.g. "the", "my") between tokens are allowed.
+ */
+function matchesCommand(
+  text: string,
+  verbs: string[],
+  recency: string[] = RECENCY_WORDS,
+  items: string[]   = ITEM_WORDS,
+): boolean {
+  // Build an alternation regex for each group, escaping special chars
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // Sort multi-word phrases longest first so they take priority in alternation
+  const byLen = (a: string, b: string) => b.length - a.length;
+
+  const vPart = verbs.sort(byLen).map(esc).join('|');
+  const rPart = recency.sort(byLen).map(esc).join('|');
+  const iPart = items.sort(byLen).map(esc).join('|');
+
+  // Pattern: <verb> ... <recency> ... <item>  (each separated by \b and \W+)
+  const re = new RegExp(
+    `(?:^|\\b)(?:${vPart})\\b[\\s\\S]*?\\b(?:${rPart})\\b[\\s\\S]*?\\b(?:${iPart})\\b`,
+    'i',
+  );
+  return re.test(text);
+}
+
+/**
+ * Extract the last word/phrase after "to X" or a bare tag/stage word at the
+ * end of a command, given the verb+recency+item prefix was already matched.
+ */
+function extractTrailingWord(text: string): string | null {
+  // "… to <word>" pattern
+  const toMatch = text.match(/\bto\s+(\w+)\s*$/i);
+  if (toMatch) return toMatch[1].toLowerCase();
+  return null;
+}
+
+/**
+ * Detect "make [the] [recency] [item] <tag/stage>" pattern.
+ * Returns the trailing bare word (the override) or null.
+ */
+function matchesMakeCommand(text: string): string | null {
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const byLen = (a: string, b: string) => b.length - a.length;
+  const rPart = [...RECENCY_WORDS].sort(byLen).map(esc).join('|');
+  const iPart = [...ITEM_WORDS].sort(byLen).map(esc).join('|');
+
+  const re = new RegExp(
+    `^make\\b[\\s\\S]*?\\b(?:${rPart})\\b[\\s\\S]*?\\b(?:${iPart})\\b\\s+(\\w+)\\s*$`,
+    'i',
+  );
+  const m = text.match(re);
+  return m ? m[1].toLowerCase() : null;
+}
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('ok', { status: 200 });
 
@@ -83,8 +146,9 @@ Deno.serve(async (req) => {
   const db    = createClient(SUPABASE_URL, SUPABASE_KEY);
   const lower = text.toLowerCase().trim();
 
-  // ── Command: delete the last card / item ──────────────────────────────────
-  if (/^delete the last (card|item)$/.test(lower)) {
+  // ── Command: delete [recency] [item] ─────────────────────────────────────
+  const DELETE_VERBS = ['delete', 'remove', 'get rid of'];
+  if (matchesCommand(lower, DELETE_VERBS)) {
     const { data, error } = await db
       .from('cards')
       .select('id, label')
@@ -102,10 +166,23 @@ Deno.serve(async (req) => {
     return new Response('ok', { status: 200 });
   }
 
-  // ── Command: update the last tag to <tag> ────────────────────────────────
-  const updateTagMatch = lower.match(/^update the last tag to (\w+)$/);
-  if (updateTagMatch) {
-    const mappedTag = TAG_MAP[updateTagMatch[1]] ?? 'brainrot';
+  // ── Command: update/change/set [recency] [item]('s)? tag to <tag> ────────
+  //            make [recency] [item] <tag> (when override is a known tag)
+  const TAG_VERBS = ['update', 'change', 'set'];
+
+  // "make" variant — handled separately because the word order differs
+  const makeOverride = matchesMakeCommand(lower);
+  const isTagMake    = makeOverride !== null && TAG_MAP[makeOverride] !== undefined;
+
+  const isTagCommand = isTagMake || (
+    matchesCommand(lower, TAG_VERBS) &&
+    /\btag\b/.test(lower) &&
+    /\bto\s+\w+/.test(lower)
+  );
+
+  if (isTagCommand) {
+    const rawTag   = isTagMake ? makeOverride! : extractTrailingWord(lower);
+    const mappedTag = rawTag ? (TAG_MAP[rawTag] ?? 'brainrot') : 'brainrot';
 
     const { data, error } = await db
       .from('cards')
@@ -124,16 +201,31 @@ Deno.serve(async (req) => {
     return new Response('ok', { status: 200 });
   }
 
-  // ── Command: move the last card to <stage> ───────────────────────────────
-  const moveMatch = lower.match(/^move the last card to (\w+)$/);
-  if (moveMatch) {
-    const stageMap: Record<string, string> = {
-      imagined: 'imagined', filmed: 'filmed', edited: 'edited', shared: 'shared',
-    };
-    const stage = stageMap[moveMatch[1]];
+  // ── Command: move/send/put/mark [recency] [item] to/in/into/as <stage> ───
+  const MOVE_VERBS = ['move', 'send', 'put', 'mark'];
+
+  // "make" variant for stage — when override is a valid stage
+  const isStageMake = makeOverride !== null && VALID_STAGES.has(makeOverride);
+
+  const isMoveCommand = isStageMake || (
+    matchesCommand(lower, MOVE_VERBS) &&
+    /\b(to|in|into|as)\s+\w+/.test(lower)
+  );
+
+  if (isMoveCommand) {
+    let stage: string | undefined;
+
+    if (isStageMake) {
+      stage = makeOverride!;
+    } else {
+      // Extract stage from "to/in/into/as <word>"
+      const stageMatch = lower.match(/\b(?:to|in|into|as)\s+(\w+)/);
+      const candidate  = stageMatch?.[1];
+      stage = candidate && VALID_STAGES.has(candidate) ? candidate : undefined;
+    }
 
     if (!stage) {
-      if (chatId) await sendTelegram(chatId, `Unknown stage "${moveMatch[1]}". Use: imagined, filmed, edited, shared.`);
+      if (chatId) await sendTelegram(chatId, `Unknown stage. Use: imagined, filmed, edited, shared.`);
       return new Response('ok', { status: 200 });
     }
 
@@ -159,15 +251,23 @@ Deno.serve(async (req) => {
   if (yesMatch) {
     if (!chatId) return new Response('ok', { status: 200 });
 
+    // Query with maybeSingle() to avoid PostgREST error on empty result
     const { data: draft, error } = await db
       .from('drafts')
       .select('*')
       .eq('chat_id', chatId)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
-    if (error || !draft) {
+    // maybeSingle() returns null data (not an error) when no rows found
+    if (error) {
+      console.error('drafts query error:', error);
+      await sendTelegram(chatId, 'Error checking for pending card. Please try again.');
+      return new Response('db error', { status: 500 });
+    }
+
+    if (!draft) {
       await sendTelegram(chatId, 'No pending card to confirm.');
       return new Response('ok', { status: 200 });
     }
