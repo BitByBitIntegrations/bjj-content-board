@@ -4,7 +4,12 @@ const TELEGRAM_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN')!;
 const SUPABASE_URL   = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_KEY   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-const URL_RE = /https?:\/\/[^\s]+/i;
+const URL_RE = /https?:\/\/[^\s]+/gi;
+
+function extractLinks(text: string): [string | null, string | null, string | null] {
+  const matches = [...text.matchAll(URL_RE)].map(m => m[0]);
+  return [matches[0] ?? null, matches[1] ?? null, matches[2] ?? null];
+}
 
 const VALID_STAGES = new Set(['imagined', 'filmed', 'edited', 'shared']);
 
@@ -191,7 +196,9 @@ Deno.serve(async (req) => {
     const { error: insertErr } = await db.from('cards').insert({
       label:       draft.label,
       description: draft.description ?? null,
-      link:        draft.link ?? null,
+      link:        draft.link  ?? null,
+      link2:       draft.link2 ?? null,
+      link3:       draft.link3 ?? null,
       tag:         finalTag,
       stage:       finalStage,
       position:    0,
@@ -209,8 +216,7 @@ Deno.serve(async (req) => {
   }
 
   // ── New card — parse and store as draft ───────────────────────────────────
-  const urlMatch = text.match(URL_RE);
-  const link     = urlMatch?.[0] ?? null;
+  const [link, link2, link3] = extractLinks(text);
   const cleaned  = text.replace(URL_RE, '').trim();
 
   // Explicit #hashtag overrides keyword guessing
@@ -242,6 +248,8 @@ Deno.serve(async (req) => {
       label,
       description,
       link,
+      link2,
+      link3,
       tag,
       stage,
     });
@@ -252,9 +260,13 @@ Deno.serve(async (req) => {
     }
 
     const descPreview = description ? description.slice(0, 100) : 'none';
+    const linkLines = [link, link2, link3]
+      .filter(Boolean)
+      .map((l, i) => `Link ${i + 1}: ${l}`)
+      .join('\n');
     await sendTelegram(
       chatId,
-      `📋 Ready to post:\nLabel: ${label}\nTag: #${tag}\nStage: ${stage}\nDescription: ${descPreview}\n\nReply <b>yes</b> to confirm.\nOverride examples:\n  yes #training → change tag\n  yes filmed → change stage\n  yes #comp filmed → change both`,
+      `📋 Ready to post:\nLabel: ${label}\nTag: #${tag}\nStage: ${stage}\nDescription: ${descPreview}${linkLines ? '\n' + linkLines : ''}\n\nReply <b>yes</b> to confirm.\nOverride examples:\n  yes #training → change tag\n  yes filmed → change stage\n  yes #comp filmed → change both`,
     );
   } else {
     // No chat_id (direct webhook without Telegram user) — insert directly
@@ -262,6 +274,8 @@ Deno.serve(async (req) => {
       label,
       description,
       link,
+      link2,
+      link3,
       tag,
       stage:    'imagined',
       position: 0,
