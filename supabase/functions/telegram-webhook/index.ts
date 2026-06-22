@@ -6,6 +6,23 @@ const SUPABASE_KEY   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const URL_RE = /https?:\/\/[^\s]+/i;
 
+const VALID_STAGES = new Set(['imagined', 'filmed', 'edited', 'shared']);
+
+// Keyword lists for smart stage guessing (checked in order — most specific first)
+const STAGE_KEYWORDS: Array<{ stage: string; keywords: string[] }> = [
+  { stage: 'shared',  keywords: ['posted', 'already posted', 'already shared', 'shared it'] },
+  { stage: 'edited',  keywords: ['edited', 'already edited'] },
+  { stage: 'filmed',  keywords: ['filmed', 'already filmed', 'just filmed', 'filmed it'] },
+];
+
+function guessStageFromKeywords(text: string): string {
+  const lower = text.toLowerCase();
+  for (const { stage, keywords } of STAGE_KEYWORDS) {
+    if (keywords.some(k => lower.includes(k))) return stage;
+  }
+  return 'imagined';
+}
+
 const TAG_MAP: Record<string, string> = {
   brainrot:     'brainrot',
   training:     'training',
@@ -127,8 +144,8 @@ Deno.serve(async (req) => {
     return new Response('ok', { status: 200 });
   }
 
-  // ── Confirmation: "yes" or "yes #<tag>" ──────────────────────────────────
-  const yesMatch = lower.match(/^yes(?:\s+#(\w+))?$/);
+  // ── Confirmation: "yes", "yes #<tag>", "yes <stage>", "yes #<tag> <stage>", "yes <stage> #<tag>" ──
+  const yesMatch = lower.match(/^yes(?:\s+(?:#(\w+)\s+(\w+)|(\w+)\s+#(\w+)|#(\w+)|(\w+)))?$/);
   if (yesMatch) {
     if (!chatId) return new Response('ok', { status: 200 });
 
@@ -145,16 +162,38 @@ Deno.serve(async (req) => {
       return new Response('ok', { status: 200 });
     }
 
-    // Allow tag override in "yes #training"
-    const overrideTagRaw = yesMatch[1]?.toLowerCase();
-    const finalTag = overrideTagRaw ? (TAG_MAP[overrideTagRaw] ?? draft.tag) : draft.tag;
+    // Parse overrides from "yes [#tag] [stage]" in any order
+    // Groups: [1]=#tag [2]=stage (form: #tag stage)
+    //         [3]=stage [4]=#tag (form: stage #tag)
+    //         [5]=#tag only
+    //         [6]=word only (stage or tag)
+    const rawTagA   = yesMatch[1] ?? yesMatch[4] ?? yesMatch[5];
+    const rawStageA = yesMatch[2] ?? yesMatch[3];
+    const rawSolo   = yesMatch[6];
+
+    // Solo word: determine if it's a stage or a tag
+    let overrideTagRaw: string | undefined;
+    let overrideStageRaw: string | undefined;
+
+    if (rawSolo) {
+      if (VALID_STAGES.has(rawSolo)) overrideStageRaw = rawSolo;
+      else overrideTagRaw = rawSolo;
+    } else {
+      overrideTagRaw   = rawTagA?.toLowerCase();
+      overrideStageRaw = rawStageA?.toLowerCase();
+    }
+
+    const finalTag   = overrideTagRaw   ? (TAG_MAP[overrideTagRaw] ?? draft.tag) : draft.tag;
+    const finalStage = (overrideStageRaw && VALID_STAGES.has(overrideStageRaw))
+      ? overrideStageRaw
+      : (draft.stage ?? 'imagined');
 
     const { error: insertErr } = await db.from('cards').insert({
       label:       draft.label,
       description: draft.description ?? null,
       link:        draft.link ?? null,
       tag:         finalTag,
-      stage:       'imagined',
+      stage:       finalStage,
       position:    0,
     });
 
@@ -185,6 +224,9 @@ Deno.serve(async (req) => {
     ? (TAG_MAP[tagMatch[1].toLowerCase()] ?? 'brainrot')
     : guessTagFromKeywords(cleaned);
 
+  // Detect stage from keywords in the original message
+  const stage = guessStageFromKeywords(cleaned);
+
   // If we only got a URL and no text, fetch the page title
   if (link && !lines.length) {
     label = await fetchTitle(link);
@@ -201,6 +243,7 @@ Deno.serve(async (req) => {
       description,
       link,
       tag,
+      stage,
     });
 
     if (draftErr) {
@@ -211,7 +254,7 @@ Deno.serve(async (req) => {
     const descPreview = description ? description.slice(0, 100) : 'none';
     await sendTelegram(
       chatId,
-      `📋 Ready to post:\nLabel: ${label}\nTag: #${tag}\nDescription: ${descPreview}\n\nReply <b>yes</b> to confirm, or <b>yes #comp</b> to change the tag.`,
+      `📋 Ready to post:\nLabel: ${label}\nTag: #${tag}\nStage: ${stage}\nDescription: ${descPreview}\n\nReply <b>yes</b> to confirm.\nOverride examples:\n  yes #training → change tag\n  yes filmed → change stage\n  yes #comp filmed → change both`,
     );
   } else {
     // No chat_id (direct webhook without Telegram user) — insert directly
