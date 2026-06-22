@@ -6,29 +6,228 @@ const SUPABASE_KEY   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const URL_RE = /https?:\/\/[^\s]+/i;
 
+const TAG_MAP: Record<string, string> = {
+  brainrot:     'brainrot',
+  training:     'training',
+  comp:         'comp',
+  competition:  'comp',
+  highlight:    'highlight',
+  highlights:   'highlight',
+  educational:  'training',
+};
+
+// Keyword lists for smart tag guessing (case-insensitive)
+const HIGHLIGHT_KEYWORDS = ['highlight', 'highlights', 'compilation', 'best of', 'montage'];
+const TRAINING_KEYWORDS  = [
+  'training', 'drill', 'technique', 'instructional', 'how to', 'tutorial',
+  'educational', 'purple belt', 'blue belt', 'white belt', 'guard', 'sweep',
+  'pass', 'submission', 'kimura', 'armbar', 'triangle', 'choke',
+];
+const COMP_KEYWORDS     = ['comp', 'competition', 'match', 'tournament', 'fight', 'bracket', 'medal'];
+const BRAINROT_KEYWORDS = ['meme', 'funny', 'viral', 'brainrot'];
+
+function guessTagFromKeywords(text: string): string {
+  const lower = text.toLowerCase();
+  if (HIGHLIGHT_KEYWORDS.some(k => lower.includes(k))) return 'highlight';
+  if (TRAINING_KEYWORDS.some(k => lower.includes(k)))  return 'training';
+  if (COMP_KEYWORDS.some(k => lower.includes(k)))      return 'comp';
+  if (BRAINROT_KEYWORDS.some(k => lower.includes(k)))  return 'brainrot';
+  return 'brainrot';
+}
+
+async function sendTelegram(chatId: number, message: string): Promise<void> {
+  await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'HTML' }),
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('ok', { status: 200 });
 
-  const body = await req.json().catch(() => null);
-  const text = body?.message?.text as string | undefined;
-  if (!text) return new Response('no text', { status: 200 });
+  const body   = await req.json().catch(() => null);
+  const text   = (body?.message?.text ?? '') as string;
+  const chatId = body?.message?.chat?.id as number | undefined;
 
+  // Ignore bot commands like /start
+  if (!text || text.startsWith('/')) return new Response('ok', { status: 200 });
+
+  const db    = createClient(SUPABASE_URL, SUPABASE_KEY);
+  const lower = text.toLowerCase().trim();
+
+  // ── Command: delete the last card / item ──────────────────────────────────
+  if (/^delete the last (card|item)$/.test(lower)) {
+    const { data, error } = await db
+      .from('cards')
+      .select('id, label')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error || !data) {
+      if (chatId) await sendTelegram(chatId, 'No cards found to delete.');
+      return new Response('ok', { status: 200 });
+    }
+
+    await db.from('cards').delete().eq('id', data.id);
+    if (chatId) await sendTelegram(chatId, `🗑️ Deleted: <b>${data.label}</b>`);
+    return new Response('ok', { status: 200 });
+  }
+
+  // ── Command: update the last tag to <tag> ────────────────────────────────
+  const updateTagMatch = lower.match(/^update the last tag to (\w+)$/);
+  if (updateTagMatch) {
+    const mappedTag = TAG_MAP[updateTagMatch[1]] ?? 'brainrot';
+
+    const { data, error } = await db
+      .from('cards')
+      .select('id, label')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error || !data) {
+      if (chatId) await sendTelegram(chatId, 'No cards found to update.');
+      return new Response('ok', { status: 200 });
+    }
+
+    await db.from('cards').update({ tag: mappedTag }).eq('id', data.id);
+    if (chatId) await sendTelegram(chatId, `✏️ Updated tag of <b>${data.label}</b> to #${mappedTag}`);
+    return new Response('ok', { status: 200 });
+  }
+
+  // ── Command: move the last card to <stage> ───────────────────────────────
+  const moveMatch = lower.match(/^move the last card to (\w+)$/);
+  if (moveMatch) {
+    const stageMap: Record<string, string> = {
+      imagined: 'imagined', filmed: 'filmed', edited: 'edited', shared: 'shared',
+    };
+    const stage = stageMap[moveMatch[1]];
+
+    if (!stage) {
+      if (chatId) await sendTelegram(chatId, `Unknown stage "${moveMatch[1]}". Use: imagined, filmed, edited, shared.`);
+      return new Response('ok', { status: 200 });
+    }
+
+    const { data, error } = await db
+      .from('cards')
+      .select('id, label')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error || !data) {
+      if (chatId) await sendTelegram(chatId, 'No cards found to move.');
+      return new Response('ok', { status: 200 });
+    }
+
+    await db.from('cards').update({ stage }).eq('id', data.id);
+    if (chatId) await sendTelegram(chatId, `📌 Moved <b>${data.label}</b> to ${stage}`);
+    return new Response('ok', { status: 200 });
+  }
+
+  // ── Confirmation: "yes" or "yes #<tag>" ──────────────────────────────────
+  const yesMatch = lower.match(/^yes(?:\s+#(\w+))?$/);
+  if (yesMatch) {
+    if (!chatId) return new Response('ok', { status: 200 });
+
+    const { data: draft, error } = await db
+      .from('drafts')
+      .select('*')
+      .eq('chat_id', chatId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error || !draft) {
+      await sendTelegram(chatId, 'No pending card to confirm.');
+      return new Response('ok', { status: 200 });
+    }
+
+    // Allow tag override in "yes #training"
+    const overrideTagRaw = yesMatch[1]?.toLowerCase();
+    const finalTag = overrideTagRaw ? (TAG_MAP[overrideTagRaw] ?? draft.tag) : draft.tag;
+
+    const { error: insertErr } = await db.from('cards').insert({
+      label:       draft.label,
+      description: draft.description ?? null,
+      link:        draft.link ?? null,
+      tag:         finalTag,
+      stage:       'imagined',
+      position:    0,
+    });
+
+    if (insertErr) {
+      console.error(insertErr);
+      await sendTelegram(chatId, 'Error saving card. Please try again.');
+      return new Response('db error', { status: 500 });
+    }
+
+    await db.from('drafts').delete().eq('id', draft.id);
+    await sendTelegram(chatId, '✅ Added to board!');
+    return new Response('ok', { status: 200 });
+  }
+
+  // ── New card — parse and store as draft ───────────────────────────────────
   const urlMatch = text.match(URL_RE);
   const link     = urlMatch?.[0] ?? null;
-  const label    = link ? text.replace(link, '').trim() || await fetchTitle(link) : text;
+  const cleaned  = text.replace(URL_RE, '').trim();
 
-  const db = createClient(SUPABASE_URL, SUPABASE_KEY);
-  const { error } = await db.from('cards').insert({
-    label:    label.slice(0, 200),
-    link,
-    tag:      'brainrot',
-    stage:    'imagined',
-    position: 0,
-  });
+  // Explicit #hashtag overrides keyword guessing
+  const tagMatch = cleaned.match(/#(\w+)/i);
+  const noTags   = cleaned.replace(/#\w+/gi, '').trim();
+  const lines    = noTags.split('\n').map((l: string) => l.trim()).filter(Boolean);
+  let label      = lines[0] ?? link ?? 'Untitled';
+  let description: string | null = lines.slice(1).join('\n').trim() || null;
 
-  if (error) {
-    console.error(error);
-    return new Response('db error', { status: 500 });
+  const tag = tagMatch
+    ? (TAG_MAP[tagMatch[1].toLowerCase()] ?? 'brainrot')
+    : guessTagFromKeywords(cleaned);
+
+  // If we only got a URL and no text, fetch the page title
+  if (link && !lines.length) {
+    label = await fetchTitle(link);
+  }
+
+  label       = label.slice(0, 200);
+  description = description?.slice(0, 1000) ?? null;
+
+  if (chatId) {
+    // Store as draft and ask for confirmation
+    const { error: draftErr } = await db.from('drafts').insert({
+      chat_id:     chatId,
+      label,
+      description,
+      link,
+      tag,
+    });
+
+    if (draftErr) {
+      console.error(draftErr);
+      return new Response('db error', { status: 500 });
+    }
+
+    const descPreview = description ? description.slice(0, 100) : 'none';
+    await sendTelegram(
+      chatId,
+      `📋 Ready to post:\nLabel: ${label}\nTag: #${tag}\nDescription: ${descPreview}\n\nReply <b>yes</b> to confirm, or <b>yes #comp</b> to change the tag.`,
+    );
+  } else {
+    // No chat_id (direct webhook without Telegram user) — insert directly
+    const { error } = await db.from('cards').insert({
+      label,
+      description,
+      link,
+      tag,
+      stage:    'imagined',
+      position: 0,
+    });
+
+    if (error) {
+      console.error(error);
+      return new Response('db error', { status: 500 });
+    }
   }
 
   return new Response('ok', { status: 200 });
@@ -36,9 +235,9 @@ Deno.serve(async (req) => {
 
 async function fetchTitle(url: string): Promise<string> {
   try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    const r    = await fetch(url, { signal: AbortSignal.timeout(4000) });
     const html = await r.text();
-    const m = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const m    = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     return m ? m[1].trim().slice(0, 200) : url;
   } catch {
     return url;
