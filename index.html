@@ -365,8 +365,16 @@
       <textarea id="editDesc"></textarea>
     </div>
     <div class="field">
-      <label>Link</label>
+      <label>Link 1</label>
       <input id="editLink" type="url" placeholder="https://…" />
+    </div>
+    <div class="field">
+      <label>Link 2</label>
+      <input id="editLink2" type="url" placeholder="https://…" />
+    </div>
+    <div class="field">
+      <label>Link 3</label>
+      <input id="editLink3" type="url" placeholder="https://…" />
     </div>
     <div class="field">
       <label>Tag</label>
@@ -524,7 +532,9 @@ function openEdit(id) {
   const c = cards.find(c => c.id === id);
   document.getElementById('editLabel').value = c.label || '';
   document.getElementById('editDesc').value  = c.description || '';
-  document.getElementById('editLink').value  = c.link || '';
+  document.getElementById('editLink').value  = c.link  || '';
+  document.getElementById('editLink2').value = c.link2 || '';
+  document.getElementById('editLink3').value = c.link3 || '';
   document.getElementById('editTag').value   = c.tag;
   document.getElementById('editStage').value = c.stage;
   document.getElementById('overlay').classList.add('open');
@@ -541,7 +551,9 @@ async function saveEdit() {
   const patch = {
     label:       document.getElementById('editLabel').value.trim(),
     description: document.getElementById('editDesc').value.trim() || null,
-    link:        document.getElementById('editLink').value.trim() || null,
+    link:        document.getElementById('editLink').value.trim()  || null,
+    link2:       document.getElementById('editLink2').value.trim() || null,
+    link3:       document.getElementById('editLink3').value.trim() || null,
     tag:         document.getElementById('editTag').value,
     stage:       document.getElementById('editStage').value,
   };
@@ -655,7 +667,9 @@ function render() {
           </div>
           <div class="card-label">${esc(c.label)}</div>
           ${c.description ? `<div class="card-desc">${esc(c.description)}</div>` : ''}
-          ${c.link ? `<a class="card-link" href="${esc(c.link)}" target="_blank" rel="noopener">${esc(c.link)}</a>` : ''}
+          ${c.link  ? `<a class="card-link" href="${esc(c.link)}"  target="_blank" rel="noopener">${esc(c.link)}</a>`  : ''}
+          ${c.link2 ? `<a class="card-link" href="${esc(c.link2)}" target="_blank" rel="noopener">${esc(c.link2)}</a>` : ''}
+          ${c.link3 ? `<a class="card-link" href="${esc(c.link3)}" target="_blank" rel="noopener">${esc(c.link3)}</a>` : ''}
           <div class="card-footer">
             <span class="tag tag-${c.tag}">${TAG_LABELS[c.tag] || c.tag}</span>
             <span class="card-date">${fmt(c.created_at)}</span>
