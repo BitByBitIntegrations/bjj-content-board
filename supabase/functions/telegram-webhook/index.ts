@@ -346,7 +346,9 @@ Deno.serve(async (req) => {
   label       = label.slice(0, 200);
   description = description?.slice(0, 5000) ?? null;
 
-  if (chatId) {
+  const isGmail = chatId === 999999;
+
+  if (chatId && !isGmail) {
     // Store as draft and ask for confirmation
     const { error: draftErr } = await db.from('drafts').insert({
       chat_id:     chatId,
