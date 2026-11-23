@@ -1,0 +1,47 @@
+# CI for the content board (static site on GitHub Pages + Supabase).
+# Runs on every PR. GitHub Pages deploys main on its own, so no deploy workflow here.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Site entry point exists
+        run: test -s index.html
+
+      - name: No secret Supabase keys committed
+        # The anon key in index.html is public by design. A service_role key
+        # bypasses all database security and must never be in the repo.
+        run: |
+          python3 - <<'PY'
+          import base64, json, re, subprocess, sys
+          bad = []
+          for f in subprocess.check_output(["git", "ls-files"], text=True).split():
+              try:
+                  s = open(f, encoding="utf-8", errors="ignore").read()
+              except (IsADirectoryError, FileNotFoundError):
+                  continue
+              for t in re.findall(r"eyJ[\w-]+\.eyJ[\w-]+\.[\w-]+", s):
+                  p = t.split(".")[1]
+                  try:
+                      role = json.loads(base64.urlsafe_b64decode(p + "=" * (-len(p) % 4))).get("role")
+                  except Exception:
+                      continue
+                  if role != "anon":
+                      bad.append(f"{f}: JWT with role={role}")
+              if re.search(r"sb_secret_[A-Za-z0-9_-]{10,}", s):
+                  bad.append(f"{f}: Supabase secret key (sb_secret_)")
+          print("\n".join(bad) or "no secret keys found")
+          sys.exit(1 if bad else 0)
+          PY

@@ -112,6 +112,10 @@ Dispatch the `review` orchestrator agent (`agents/orchestrators/review.md`). It 
 
 Fix all Critical issues. Max 2 fix cycles via the orchestrator, then proceed.
 
+**High-stakes changes** (auth, payments, data model, anything touching user data): also dispatch the `second-opinion` agent in parallel with the review orchestrator. It reviews the diff cold and pulls in a cross-model review if Codex/Gemini CLI is installed.
+
+**If `guard-overnight.sh` blocks a command:** don't route around it. Note it in the PR body as a decision for the founder and continue.
+
 ### 2H. Documentation (via documentation orchestrator)
 
 Dispatch the `documentation` orchestrator agent (`agents/orchestrators/documentation.md`). It will:
@@ -134,6 +138,8 @@ gh pr create --title "<type>(<identifier>): <title>" --body "..."
 ```
 
 If confidence < 90%, use `--draft`. **NEVER merge the PR.**
+
+If the repo has GitHub Actions (`.github/workflows/`), wait for CI: `gh pr checks <pr> --watch`. Red CI = treat the failing step as a Critical finding, go back to 2E (counts toward the 8-iteration cap). Report the CI status in the session summary. If the repo has no CI yet, say so in the PR body and suggest running the `devops` agent.
 
 ### 2K. Task complete — transition to next task without touching main
 

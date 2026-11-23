@@ -12,7 +12,7 @@ PROTECTED_PATHS=(
   "node_modules/"   # installed dependencies
   ".next/"          # Next.js build output
   "dist/"           # build output
-  "src/generated/"  # Prisma client output (regenerate with `npx prisma generate`)
+  # "generated/"      # code-generated files (Prisma, GraphQL codegen)
 
   # iOS / Swift
   # ".build/"         # Swift build output
@@ -28,6 +28,18 @@ PROTECTED_PATHS=(
 )
 
 input=$(cat)
+
+# Overnight strict mode (armed by /overnight): CI/CD workflows are locked.
+# A workflow edited on a branch runs on that branch's push — with repo secrets.
+# Workflow changes are a daytime job, reviewed by the founder.
+
+if [ -f "${CLAUDE_PROJECT_DIR:-.}/.claude/overnight/ACTIVE" ] || [ -f ".claude/overnight/ACTIVE" ]; then
+  if echo "$input" | grep -qF ".github/workflows/"; then
+    echo "BLOCKED: .github/workflows/ is locked during /overnight — CI/CD changes run with repo secrets." >&2
+    echo "  -> Add it as a decision in the morning report instead." >&2
+    exit 2
+  fi
+fi
 
 for pattern in "${PROTECTED_PATHS[@]}"; do
   if echo "$input" | grep -qF "\"$pattern"; then

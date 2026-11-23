@@ -15,7 +15,7 @@ BASENAME=$(basename "$FILE_PATH")
 
 # Block writes to .env files
 case "$BASENAME" in
-  .env|.env.local|.env.production|.env.development|.env.staging|.env.*)
+  .env|.env.local|.env.production|.env.development|.env.staging|.env.*|.secrets)
     echo "BLOCKED: Cannot modify $BASENAME — environment files must not be edited by AI."
     echo "Create a .env.local.example instead with placeholder values."
     exit 2
