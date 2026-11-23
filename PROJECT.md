@@ -32,6 +32,7 @@ A kanban board for tracking BJJ video ideas through **Imagined → Filmed → Ed
 - **Stages:** `imagined` | `filmed` | `edited` | `shared`
 - **RLS:** permissive (private single-user board)
 - **Realtime:** enabled on `cards` table via `supabase_realtime` publication
+- **Keep-alive:** `.github/workflows/supabase-keepalive.yml` pings the DB daily so the free-tier project never pauses (it paused Sept–Nov 2026 and the board went blank). If that workflow fails, GitHub emails you: restore the project in the Supabase dashboard.
 
 ## Local dev
 ```bash
