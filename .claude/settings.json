@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/guard-context-budget.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-context-budget.sh"
           }
         ]
       },
@@ -15,11 +15,20 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/guard-secrets.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-secrets.sh"
           },
           {
             "type": "command",
-            "command": "bash .claude/hooks/guard-protected-paths.sh"
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-protected-paths.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-overnight.sh"
           }
         ]
       }

@@ -1,0 +1,6 @@
+.claude/settings.local.json
+.claude/overnight/
+.secrets
+.env*
+supabase/.temp/
+.DS_Store
