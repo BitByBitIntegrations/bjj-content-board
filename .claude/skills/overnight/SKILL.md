@@ -98,11 +98,15 @@ Agents check each other's work until the output is clean. Don't let one agent gr
 1. **Design** — `architect` agent writes a short plan for the task into `.claude/overnight/<date>/<id>-plan.md`. Skip for tiny fixes.
 2. **Build** — `implementer` agent works in the task's worktree.
 3. **Test** — `tester` agent writes/runs tests; run the platform's lint/typecheck/build/test.
+3b. **Verify** — `verifier` agent drives the real app through every scenario in the task's Verification section (tasks get Goal / Context / Verification at kickoff, per the `spec` skill). No evidence = not done.
 4. **Review ×2** — run BOTH in parallel:
    - `review` orchestrator (normal quality pipeline)
    - `second-opinion` agent (fresh eyes, never saw the build; uses a different model/CLI if available)
-5. Any Critical/Important finding → back to step 2 with the findings. **Max 4 loops per task.**
-6. Clean → commit on the `overnight/*` branch, push the branch, open a **draft** PR. Never merge.
+5. Any Critical/Important finding or failed verification → back to step 2 with the findings. **Max 4 loops per task.**
+5b. **Simplify ×2** — once clean, run the `code-quality` agent two more times in a row (pass 2 and 3, each given earlier findings). Apply what they find, re-test, re-verify. Done when a pass reports 0 new findings.
+6. Clean → commit on the `overnight/*` branch, push the branch, open a PR. Never merge it yourself.
+   - Fully clean (VERIFIED + review clean + code-quality CLEAN): open it ready for review with `--label agent:auto-merge`. If the founder opted this repo into auto-merge, GitHub merges it after CI passes. Skip the label for auth, payments, migrations, CI/CD, or `.claude/` changes.
+   - Anything less: open as **draft**, no label.
    If the repo has GitHub Actions, wait for CI (`gh pr checks <pr> --watch`). Red CI = back to step 2 with the failure as a finding. Only green-CI PRs count as "clean" in the report.
 7. Stuck after 4 loops → draft PR with a "STUCK" note + what you tried. Draft PR beats silence.
 

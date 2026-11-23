@@ -78,7 +78,9 @@ If no `$ARGUMENTS`:
 
 **Max 8 iterations per task.** Draft PR if stuck.
 
-### 2A. Task intake — extract title, description, acceptance criteria, type
+### 2A. Task intake — Goal / Context / Verification
+
+Every task needs the three sections from the `spec` skill: **Goal**, **Context** (real code paths), **Verification** (user-observable scenarios incl. one edge case and one failure path). If the ticket is missing any, fill the gaps yourself using the `spec` skill's format (mark guesses `ASSUMED`) and write it to `.claude/ticket-progress.md`. The Verification section is the definition of done for every later step.
 ### 2B. Branch setup — `git checkout -b <type>/<identifier>-<slug> origin/main`
 
 ### 2C. Codebase exploration (via explorer agent)
@@ -102,6 +104,12 @@ Run independent steps in parallel. Quality gates every 2-3 steps.
 
 ### 2F. Test verification (via tester agent)
 
+### 2F-2. Prove it works (via verifier agent)
+
+Dispatch the `verifier` agent with the spec's Verification section and the branch. It drives the real app using the project's `.claude/skills/verify-<app>/` skill and returns evidence per scenario.
+- FAILED/PARTIAL → the failing scenarios are Critical findings; back to 2E.
+- `NO-VERIFY-SKILL` → continue with its ad-hoc evidence, and put "run `/create-verification-skill`" in the PR body.
+
 ### 2G. Review (via review orchestrator)
 
 Dispatch the `review` orchestrator agent (`agents/orchestrators/review.md`). It will:
@@ -111,6 +119,8 @@ Dispatch the `review` orchestrator agent (`agents/orchestrators/review.md`). It 
 - Offer auto-fixes for Critical/Important issues
 
 Fix all Critical issues. Max 2 fix cycles via the orchestrator, then proceed.
+
+**Simplify loop (always):** after Critical issues are fixed, run the `code-quality` agent again as pass 2 (pass it pass 1's findings). If pass 2 reports new Simplify/Restructure findings, have the implementer apply them, re-run tests + verifier, and run pass 3. Stop when a pass reports `New findings this pass: 0`, or after 3 passes. Models are non-deterministic, so each fresh pass catches things the last one missed.
 
 **High-stakes changes** (auth, payments, data model, anything touching user data): also dispatch the `second-opinion` agent in parallel with the review orchestrator. It reviews the diff cold and pulls in a cross-model review if Codex/Gemini CLI is installed.
 
@@ -137,7 +147,11 @@ echo "=== FINAL CHECK ===" && <LINT_CMD> && <TYPE_CMD> && <BUILD_CMD> && <TEST_C
 gh pr create --title "<type>(<identifier>): <title>" --body "..."
 ```
 
-If confidence < 90%, use `--draft`. **NEVER merge the PR.**
+If confidence < 90%, use `--draft`. **NEVER merge the PR yourself** (`gh pr merge` is blocked by the guard).
+
+**Auto-merge label:** add `--label agent:auto-merge` only when ALL of these are true: the verifier returned VERIFIED, review found no Critical/Important issues, the last code-quality pass was CLEAN, and the PR is not a draft. The repo's `agent-automerge.yml` workflow merges it after CI passes, but only if the founder turned auto-merge on for that repo (`AGENT_AUTOMERGE=true` repo variable). Otherwise the label does nothing. Never add the label to changes in auth, payments, data migrations, CI/CD workflows, or `.claude/`; those always wait for the founder. If the label doesn't exist, skip it and say so in the summary.
+
+Put the verifier's evidence table and the final code-quality verdict in the PR body.
 
 If the repo has GitHub Actions (`.github/workflows/`), wait for CI: `gh pr checks <pr> --watch`. Red CI = treat the failing step as a Critical finding, go back to 2E (counts toward the 8-iteration cap). Report the CI status in the session summary. If the repo has no CI yet, say so in the PR body and suggest running the `devops` agent.
 

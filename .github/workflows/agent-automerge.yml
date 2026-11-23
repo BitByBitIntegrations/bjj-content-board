@@ -1,0 +1,95 @@
+# Opt-in auto-merge for agent PRs ("let agents merge their own code").
+# Copy to <project>/.github/workflows/agent-automerge.yml.
+#
+# OFF unless the founder turns it on for this repo:
+#   Settings → Secrets and variables → Actions → Variables → AGENT_AUTOMERGE = true
+#   (or: gh variable set AGENT_AUTOMERGE --body true -R <owner>/<repo>)
+# Turn it off any time: set it to false or delete it.
+#
+# A PR is merged only when ALL of these are true:
+#   - it has the `agent:auto-merge` label (agents add it only after VERIFIED + review clean + code-quality CLEAN)
+#   - it's not a draft, targets the default branch, and comes from a branch in this repo (no forks)
+#   - every other check on the head commit finished green (and at least one exists)
+#   - it doesn't touch a protected path (CI/CD, agent config, guards, migrations) — those always wait for a human
+#
+# Merging = deploying on repos with a deploy workflow / GitHub Pages.
+# Note: merges made with the default GITHUB_TOKEN don't trigger other workflows (e.g. deploy.yml).
+# If this repo deploys from a workflow, add a repo secret AUTOMERGE_TOKEN (fine-grained token, this repo only,
+# Contents + Pull requests: write) so the merge triggers the deploy.
+name: agent-automerge
+
+on:
+  pull_request:
+    types: [labeled, ready_for_review, synchronize]
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+  statuses: read
+
+concurrency:
+  group: agent-automerge-${{ github.event.pull_request.number || github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  automerge:
+    if: vars.AGENT_AUTOMERGE == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ secrets.AUTOMERGE_TOKEN || github.token }}
+      REPO: ${{ github.repository }}
+      LABEL: agent:auto-merge
+      # Paths that always need a human. Extend per project.
+      PROTECTED: '^(\.github/|\.claude/|hooks/|scripts/|tests/|settings\.json$|.*migrations?/|supabase/)'
+      SELF_JOB: automerge
+    steps:
+      - name: Find PR
+        id: pr
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "n=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+          else
+            [ "${{ github.event.workflow_run.conclusion }}" = "success" ] || { echo "CI not green, nothing to do"; exit 0; }
+            owner="${REPO%%/*}"
+            n=$(gh api "repos/$REPO/pulls?state=open&head=$owner:${{ github.event.workflow_run.head_branch }}" --jq '.[0].number // empty')
+            echo "n=$n" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check eligibility and merge
+        if: steps.pr.outputs.n != ''
+        run: |
+          set -euo pipefail
+          n=${{ steps.pr.outputs.n }}
+          pr=$(gh api "repos/$REPO/pulls/$n")
+          skip() { echo "Not merging #$n: $1"; exit 0; }
+
+          echo "$pr" | jq -e --arg l "$LABEL" '[.labels[].name] | index($l)' >/dev/null || skip "no $LABEL label"
+          [ "$(echo "$pr" | jq -r .state)" = "open" ] || skip "not open"
+          [ "$(echo "$pr" | jq -r .draft)" = "false" ] || skip "draft"
+          default=$(gh api "repos/$REPO" --jq .default_branch)
+          [ "$(echo "$pr" | jq -r .base.ref)" = "$default" ] || skip "base is not $default"
+          [ "$(echo "$pr" | jq -r .head.repo.full_name)" = "$REPO" ] || skip "PR from a fork"
+          sha=$(echo "$pr" | jq -r .head.sha)
+
+          files=$(gh api --paginate "repos/$REPO/pulls/$n/files" --jq '.[].filename')
+          hits=$(echo "$files" | grep -E "$PROTECTED" || true)
+          if [ -n "$hits" ]; then
+            gh pr comment "$n" -R "$REPO" --body "Auto-merge skipped: this PR touches protected paths, so it needs a human. $(echo "$hits" | head -5 | sed 's/^/`/;s/$/`/' | paste -sd, -)"
+            gh pr edit "$n" -R "$REPO" --remove-label "$LABEL" || true
+            skip "protected paths"
+          fi
+
+          runs=$(gh api --paginate "repos/$REPO/commits/$sha/check-runs" --jq ".check_runs[] | select(.name != \"$SELF_JOB\") | \"\(.status) \(.conclusion)\"")
+          [ -n "$runs" ] || skip "no checks on $sha yet"
+          if echo "$runs" | grep -qv '^completed '; then skip "checks still running (will retry when ci finishes)"; fi
+          if echo "$runs" | grep -qvE '^completed (success|skipped|neutral)$'; then skip "a check failed"; fi
+          bad=$(gh api "repos/$REPO/commits/$sha/status" --jq '[.statuses[] | select(.state != "success")] | length')
+          [ "$bad" = "0" ] || skip "a commit status is not green"
+
+          gh pr merge "$n" -R "$REPO" --squash --delete-branch --match-head-commit "$sha"
+          echo "Merged #$n at $sha"

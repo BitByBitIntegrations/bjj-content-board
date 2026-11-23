@@ -56,6 +56,11 @@ ALWAYS=(
   # 'kubectl[[:space:]]+(apply|delete).*prod|||prod cluster change'
   # 'terraform[[:space:]]+(apply|destroy)|||infra change'
 
+  # Repo settings that only the founder changes (e.g. the AGENT_AUTOMERGE opt-in)
+  'gh[[:space:]]+(variable|secret)[[:space:]]+(set|delete|remove)|||changing repo variables/secrets (founder only)'
+  'gh[[:space:]]+api.*actions/(variables|secrets)|||changing repo variables/secrets (founder only)'
+  'gh[[:space:]]+api.*branches/[^[:space:]]+/protection|||changing branch protection (founder only)'
+
   # Publishing / money
   '(npm|pnpm|yarn)[[:space:]]+publish|||publishing a package'
   'stripe[[:space:]].*--live|||live Stripe call'

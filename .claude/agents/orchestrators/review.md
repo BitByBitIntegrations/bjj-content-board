@@ -35,6 +35,7 @@ Categorize each changed file:
 **Always dispatch (parallel):**
 - `reviewer` agent — code quality, spec compliance, code hygiene
 - `security` agent — vulnerability scan
+- `code-quality` agent — thermo-nuclear + ponytail simplification pass (pass number and earlier findings from the caller, if any)
 
 **Conditional (parallel with above):**
 
@@ -90,7 +91,7 @@ If there are Critical or Important issues:
 ## Rules
 
 - Never review code yourself — dispatch agents.
-- Always dispatch reviewer + security at minimum.
+- Always dispatch reviewer + security + code-quality at minimum.
 - Launch all agents in parallel — don't serialize.
 - One Critical finding from any agent = BLOCKED verdict.
 - Return a single consolidated report to the caller.

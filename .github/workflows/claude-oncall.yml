@@ -1,0 +1,72 @@
+# 24/7 on-call engineer ("cloud agents that fix bugs while you sleep").
+# Copy to <project>/.github/workflows/claude-oncall.yml.
+#
+# Each run gets its own fresh cloud machine (a GitHub runner), so many can run in parallel
+# without stepping on each other — no worktrees needed.
+#
+# Triggers:
+#   - Label an issue `agent-fix`  → Claude runs /sybau on it: reproduce, fix, verify, open a PR.
+#     Hook up Sentry / PostHog to auto-create GitHub issues with that label and errors get fixed while you sleep.
+#   - Comment `@claude ...` on an issue or PR → Claude answers / makes the change.
+#
+# The project's .claude/ (agents, skills, guard hooks) is used as-is, so the same rules apply:
+# no merging, no deploys, no prod migrations, no secrets. If the repo opted into auto-merge,
+# a fully verified fix gets the `agent:auto-merge` label and lands after CI passes.
+#
+# One-time setup (founder):
+#   1. Install the Claude GitHub App on the repo/org: https://github.com/apps/claude
+#   2. Add ONE secret: CLAUDE_CODE_OAUTH_TOKEN (run `claude setup-token`, uses your Claude plan)
+#      or ANTHROPIC_API_KEY (Claude Console, pay per use). Or run /install-github-app in Claude Code.
+#   3. Create the label: gh label create agent-fix --color D93F0B -R <owner>/<repo>
+name: claude-oncall
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+  actions: read
+
+jobs:
+  fix-issue:
+    if: github.event_name == 'issues' && github.event.label.name == 'agent-fix'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    concurrency:
+      group: oncall-issue-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Let error-tracker bots (Sentry, PostHog) open + label issues that trigger a fix.
+          allowed_bots: "sentry-io[bot],posthog[bot]"
+          prompt: "/sybau #${{ github.event.issue.number }}"
+          claude_args: |
+            --max-turns 150
+            --append-system-prompt "You are the on-call engineer running unattended in GitHub Actions. Nobody will answer questions: decide and mark ASSUMED. For a bug, reproduce it first (verifier agent on the base branch), then fix, then prove the fix with the verifier. Comment on issue #${{ github.event.issue.number }} with the PR link and the verification evidence table when done, or with exactly what blocked you."
+
+  mention:
+    if: github.event_name != 'issues' && contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
