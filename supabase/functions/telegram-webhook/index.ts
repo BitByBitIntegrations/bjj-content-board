@@ -62,6 +62,17 @@ function guessTagFromKeywords(text: string): string {
   return 'brainrot';
 }
 
+async function fetchTitle(url: string): Promise<string> {
+  try {
+    const r    = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    const html = await r.text();
+    const m    = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    return m ? m[1].trim().slice(0, 200) : url;
+  } catch {
+    return url;
+  }
+}
+
 async function sendTelegram(chatId: number, message: string): Promise<void> {
   await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
     method: 'POST',
@@ -134,6 +145,37 @@ function matchesMakeCommand(text: string): string | null {
 }
 
 Deno.serve(async (req) => {
+  // iOS Shortcut: GET ?text=<url_encoded_text>
+  if (req.method === 'GET') {
+    const url    = new URL(req.url);
+    const text   = url.searchParams.get('text') ?? '';
+    if (!text) return new Response('missing text', { status: 400 });
+
+    // Reuse existing logic by treating as a Gmail-style direct insert (no confirmation)
+    // Parse and insert directly
+    const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+    const [link, link2, link3] = extractLinks(text);
+    const cleaned = text.replace(/https?:\/\/[^\s]+/gi, '').trim();
+    const tagMatch = cleaned.match(/#(\w+)/i);
+    const noTags = cleaned.replace(/#\w+/gi, '').trim();
+    const lines = noTags.split('\n').map((l: string) => l.trim()).filter(Boolean);
+    let label = lines[0] ?? link ?? 'Untitled';
+    const description = lines.slice(1).join('\n').trim() || null;
+    const tag = tagMatch ? (TAG_MAP[tagMatch[1].toLowerCase()] ?? 'brainrot') : guessTagFromKeywords(cleaned);
+    const stage = guessStageFromKeywords(cleaned);
+
+    if (link && !lines.length) label = await fetchTitle(link);
+
+    const { error } = await db.from('cards').insert({
+      label: label.slice(0, 200),
+      description: description?.slice(0, 5000) ?? null,
+      link, link2, link3, tag, stage, position: 0,
+    });
+
+    if (error) return new Response('db error', { status: 500 });
+    return new Response('ok', { status: 200 });
+  }
+
   if (req.method !== 'POST') return new Response('ok', { status: 200 });
 
   const body   = await req.json().catch(() => null);
@@ -396,14 +438,3 @@ Deno.serve(async (req) => {
 
   return new Response('ok', { status: 200 });
 });
-
-async function fetchTitle(url: string): Promise<string> {
-  try {
-    const r    = await fetch(url, { signal: AbortSignal.timeout(4000) });
-    const html = await r.text();
-    const m    = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    return m ? m[1].trim().slice(0, 200) : url;
-  } catch {
-    return url;
-  }
-}
