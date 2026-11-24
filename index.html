@@ -465,38 +465,31 @@
 
     .swipe-hero {
       width: 100%;
-      height: 200px;
+      height: 420px;
       object-fit: cover;
       display: block;
+      border-radius: 12px 12px 0 0;
     }
 
     .swipe-hero-gradient {
       width: 100%;
-      height: 200px;
+      height: 420px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 40px;
+      font-size: 64px;
+      border-radius: 12px 12px 0 0;
     }
 
     .swipe-body {
-      padding: 18px;
+      padding: 14px 16px;
     }
 
     .swipe-label {
-      font-size: 18px;
-      font-weight: 700;
+      font-size: 15px;
+      font-weight: 600;
       line-height: 1.3;
-      margin-bottom: 10px;
-    }
-
-    .swipe-desc {
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.55;
-      margin-bottom: 12px;
-      max-height: 140px;
-      overflow-y: auto;
+      margin-bottom: 8px;
     }
 
     .swipe-links {
@@ -1195,7 +1188,6 @@ function renderSwipe() {
     ${hero}
     <div class="swipe-body">
       <div class="swipe-label">${esc(c.label)}</div>
-      ${c.description ? `<div class="swipe-desc">${esc(c.description)}</div>` : ''}
       ${linksHtml}
       <div class="swipe-footer">
         <span class="tag tag-${c.tag}">${TAG_LABELS[c.tag] || c.tag}</span>
