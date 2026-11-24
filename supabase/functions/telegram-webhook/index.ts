@@ -62,15 +62,25 @@ function guessTagFromKeywords(text: string): string {
   return 'brainrot';
 }
 
-async function fetchTitle(url: string): Promise<string> {
+async function fetchMeta(url: string): Promise<{ title: string; ogImage: string | null }> {
   try {
     const r    = await fetch(url, { signal: AbortSignal.timeout(4000) });
     const html = await r.text();
-    const m    = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    return m ? m[1].trim().slice(0, 200) : url;
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    const title = titleMatch ? titleMatch[1].trim().slice(0, 200) : url;
+    // Parse og:image — handle both single and double quotes
+    const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+                 ?? html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+    const ogImage = ogMatch ? ogMatch[1].trim() : null;
+    return { title, ogImage };
   } catch {
-    return url;
+    return { title: url, ogImage: null };
   }
+}
+
+/** @deprecated Use fetchMeta instead */
+async function fetchTitle(url: string): Promise<string> {
+  return (await fetchMeta(url)).title;
 }
 
 async function sendTelegram(chatId: number, message: string): Promise<void> {
@@ -164,12 +174,20 @@ Deno.serve(async (req) => {
     const tag = tagMatch ? (TAG_MAP[tagMatch[1].toLowerCase()] ?? 'brainrot') : guessTagFromKeywords(cleaned);
     const stage = guessStageFromKeywords(cleaned);
 
-    if (link && !lines.length) label = await fetchTitle(link);
+    let ogImage: string | null = null;
+    if (link && !lines.length) {
+      const meta = await fetchMeta(link);
+      label = meta.title;
+      ogImage = meta.ogImage;
+    } else if (link) {
+      ogImage = (await fetchMeta(link)).ogImage;
+    }
 
     const { error } = await db.from('cards').insert({
       label: label.slice(0, 200),
       description: description?.slice(0, 5000) ?? null,
       link, link2, link3, tag, stage, position: 0,
+      og_image: ogImage,
     });
 
     if (error) return new Response('db error', { status: 500 });
@@ -349,6 +367,7 @@ Deno.serve(async (req) => {
       tag:         finalTag,
       stage:       finalStage,
       position:    0,
+      og_image:    draft.og_image ?? null,
     });
 
     if (insertErr) {
@@ -380,9 +399,12 @@ Deno.serve(async (req) => {
   // Detect stage from keywords in the original message
   const stage = guessStageFromKeywords(cleaned);
 
-  // If we only got a URL and no text, fetch the page title
-  if (link && !lines.length) {
-    label = await fetchTitle(link);
+  // If we only got a URL and no text, fetch the page title + og:image
+  let ogImage: string | null = null;
+  if (link) {
+    const meta = await fetchMeta(link);
+    if (!lines.length) label = meta.title;
+    ogImage = meta.ogImage;
   }
 
   label       = label.slice(0, 200);
@@ -401,6 +423,7 @@ Deno.serve(async (req) => {
       link3,
       tag,
       stage,
+      og_image:    ogImage,
     });
 
     if (draftErr) {
@@ -428,6 +451,7 @@ Deno.serve(async (req) => {
       tag,
       stage:    'imagined',
       position: 0,
+      og_image: ogImage,
     });
 
     if (error) {
