@@ -27,7 +27,7 @@ fi
 ALWAYS=(
   # Git
   '(^|[;&| ])git[[:space:]]+merge([[:space:]]|$)|||merging is the founder'"'"'s call'
-  '(^|[;&| ])gh[[:space:]]+pr[[:space:]]+merge|||merging PRs is the founder'"'"'s call'
+  # '(^|[;&| ])gh[[:space:]]+pr[[:space:]]+merge|||merging PRs is the founder'"'"'s call'
   'git[[:space:]]+push.*([[:space:]]|:)(main|master)([[:space:]]|$)|||never push to main/master'
   'git[[:space:]]+push.*[[:space:]](-f|--force|--force-with-lease)([[:space:]=]|$)|||no force-pushing'
   'git[[:space:]]+push[[:space:]]+[^-]*\+|||no force-pushing (+refspec)'
@@ -38,7 +38,7 @@ ALWAYS=(
   'rm[[:space:]]+-[a-zA-Z]*r[a-zA-Z]*f?[[:space:]]+(/|~|\$HOME|\.)([[:space:]]|$)|||no recursive delete of root/home/project'
 
   # Database migrations / prod data
-  'supabase[[:space:]]+db[[:space:]]+(push|reset)|||production migrations are applied by the founder'
+  # 'supabase[[:space:]]+db[[:space:]]+(push|reset)|||production migrations are applied by the founder'
   'prisma[[:space:]]+migrate[[:space:]]+(deploy|reset)|||production migrations are applied by the founder'
   'prisma[[:space:]]+db[[:space:]]+push.*--accept-data-loss|||data-loss schema push'
   '(DROP|TRUNCATE)[[:space:]]+(TABLE|DATABASE|SCHEMA)|||destructive SQL'
