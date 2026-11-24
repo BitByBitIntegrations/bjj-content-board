@@ -62,13 +62,51 @@ function guessTagFromKeywords(text: string): string {
   return 'brainrot';
 }
 
+function youtubeThumbnail(url: string): string | null {
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m ? `https://img.youtube.com/vi/${m[1]}/hqdefault.jpg` : null;
+}
+
+async function instagramThumbnail(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(`https://api.instagram.com/oembed?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(4000) });
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j.thumbnail_url ?? null;
+  } catch { return null; }
+}
+
 async function fetchMeta(url: string): Promise<{ title: string; ogImage: string | null }> {
+  // YouTube: derive thumbnail directly from video ID
+  const ytThumb = youtubeThumbnail(url);
+  if (ytThumb) {
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(4000) });
+      const html = await r.text();
+      const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const title = titleMatch ? titleMatch[1].trim().slice(0, 200) : url;
+      return { title, ogImage: ytThumb };
+    } catch { return { title: url, ogImage: ytThumb }; }
+  }
+
+  // Instagram: use oEmbed
+  if (/instagram\.com/.test(url)) {
+    const igThumb = await instagramThumbnail(url);
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(4000) });
+      const html = await r.text();
+      const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const title = titleMatch ? titleMatch[1].trim().slice(0, 200) : url;
+      return { title, ogImage: igThumb };
+    } catch { return { title: url, ogImage: igThumb }; }
+  }
+
+  // Generic: fetch page and parse og:image
   try {
     const r    = await fetch(url, { signal: AbortSignal.timeout(4000) });
     const html = await r.text();
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     const title = titleMatch ? titleMatch[1].trim().slice(0, 200) : url;
-    // Parse og:image — handle both single and double quotes
     const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
                  ?? html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
     const ogImage = ogMatch ? ogMatch[1].trim() : null;
