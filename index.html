@@ -37,11 +37,12 @@
     }
 
     header {
-      padding: 18px 24px;
+      padding: 14px 24px;
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       gap: 12px;
+      flex-wrap: wrap;
     }
 
     header h1 {
@@ -60,10 +61,38 @@
       height: 8px;
       border-radius: 50%;
       background: var(--muted);
-      margin-left: auto;
       transition: background .3s;
     }
     .status-dot.live { background: #22c55e; }
+
+    /* View switcher */
+    .view-switcher {
+      display: flex;
+      gap: 4px;
+      margin-left: auto;
+      align-items: center;
+    }
+
+    .view-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 6px;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 14px;
+      transition: color .15s, border-color .15s, background .15s;
+    }
+    .view-btn:hover { color: var(--text); border-color: #555; }
+    .view-btn.active {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
 
     /* Add bar */
     .add-bar {
@@ -113,7 +142,7 @@
     .btn:hover { opacity: .85; }
     .btn:disabled { opacity: .4; cursor: default; }
 
-    /* Board */
+    /* ── KANBAN VIEW ─────────────────────────────────── */
     .board {
       display: flex;
       gap: 16px;
@@ -163,7 +192,7 @@
     }
     .card-list.drag-over { background: var(--accent-dim); }
 
-    /* Card */
+    /* Card (kanban) */
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -176,6 +205,15 @@
     }
     .card:hover { border-color: #444; }
     .card.dragging { opacity: .4; cursor: grabbing; }
+
+    .card-og-thumb {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      display: block;
+    }
 
     .card-label {
       font-weight: 500;
@@ -227,6 +265,17 @@
     .tag-highlight  { background: rgba(249,115,22,.2);  color: #fb923c; }
     .tag-education  { background: rgba(22,163,74,.2);   color: #4ade80; }
 
+    .stage-badge {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      padding: 2px 7px;
+      border-radius: 99px;
+      background: var(--surface2);
+      color: var(--muted);
+    }
+
     .card-date {
       font-size: 11px;
       color: var(--muted);
@@ -258,6 +307,234 @@
     }
     .icon-btn:hover { color: var(--text); border-color: #555; }
     .icon-btn.danger:hover { color: #f87171; border-color: var(--danger); }
+
+    /* ── LIST VIEW ───────────────────────────────────── */
+    .list-view {
+      flex: 1;
+      padding: 20px 24px;
+      overflow-y: auto;
+    }
+
+    .list-stage-group { margin-bottom: 24px; }
+
+    .list-stage-header {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .9px;
+      color: var(--muted);
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 6px;
+    }
+
+    .list-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 6px;
+      border-radius: 6px;
+      transition: background .12s;
+      position: relative;
+    }
+    .list-row:hover { background: var(--surface); }
+
+    .list-og-thumb {
+      width: 40px;
+      height: 40px;
+      object-fit: cover;
+      border-radius: 5px;
+      flex-shrink: 0;
+    }
+
+    .list-og-placeholder {
+      width: 40px;
+      height: 40px;
+      border-radius: 5px;
+      flex-shrink: 0;
+      background: var(--surface2);
+    }
+
+    .list-label {
+      font-weight: 600;
+      font-size: 13px;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .list-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .list-date {
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .list-actions {
+      display: none;
+      gap: 4px;
+    }
+    .list-row:hover .list-actions { display: flex; }
+
+    /* ── CARD SWIPE VIEW ─────────────────────────────── */
+    .swipe-view {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 24px 24px;
+      overflow: hidden;
+    }
+
+    .swipe-stage-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .swipe-tab {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: color .15s, border-color .15s, background .15s;
+    }
+    .swipe-tab:hover { color: var(--text); border-color: #555; }
+    .swipe-tab.active {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .swipe-deck-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      max-width: 480px;
+      position: relative;
+    }
+
+    .swipe-nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 18px;
+      z-index: 2;
+      transition: border-color .15s, background .15s;
+      user-select: none;
+    }
+    .swipe-nav:hover { background: var(--surface); border-color: #555; }
+    .swipe-nav:disabled { opacity: .3; cursor: default; }
+    .swipe-nav.prev { left: -48px; }
+    .swipe-nav.next { right: -48px; }
+
+    .swipe-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 100%;
+      overflow: hidden;
+      touch-action: pan-y;
+    }
+
+    .swipe-hero {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      display: block;
+    }
+
+    .swipe-hero-gradient {
+      width: 100%;
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+    }
+
+    .swipe-body {
+      padding: 18px;
+    }
+
+    .swipe-label {
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.3;
+      margin-bottom: 10px;
+    }
+
+    .swipe-desc {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+      margin-bottom: 12px;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+
+    .swipe-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .swipe-link-chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      color: var(--accent);
+      font-size: 11px;
+      padding: 3px 10px;
+      text-decoration: none;
+      white-space: nowrap;
+      overflow: hidden;
+      max-width: 220px;
+      text-overflow: ellipsis;
+      transition: border-color .15s;
+    }
+    .swipe-link-chip:hover { border-color: var(--accent); }
+
+    .swipe-footer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .swipe-counter {
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 12px;
+    }
 
     /* Modal */
     .overlay {
@@ -327,6 +604,9 @@
     @media (max-width: 640px) {
       .board { padding: 12px; }
       .add-bar { padding: 10px 12px; flex-wrap: wrap; }
+      .swipe-nav.prev { left: -4px; }
+      .swipe-nav.next { right: -4px; }
+      .swipe-deck-wrap { padding: 0 32px; }
     }
   </style>
 </head>
@@ -337,7 +617,30 @@
     <h1>BJJ Content Board</h1>
     <div class="subtitle">Imagined → Filmed → Edited → Shared</div>
   </div>
-  <span class="status-dot" id="statusDot" title="Connecting…"></span>
+  <div class="view-switcher">
+    <span class="status-dot" id="statusDot" title="Connecting…"></span>
+    <button class="view-btn" id="btnKanban" onclick="setView('kanban')" title="Kanban">
+      <!-- grid icon -->
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="5" height="12" rx="1" fill="currentColor"/>
+        <rect x="8" y="1" width="5" height="8" rx="1" fill="currentColor"/>
+      </svg>
+    </button>
+    <button class="view-btn" id="btnList" onclick="setView('list')" title="List">
+      <!-- list icon -->
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="2" width="12" height="2" rx="1" fill="currentColor"/>
+        <rect x="1" y="6" width="12" height="2" rx="1" fill="currentColor"/>
+        <rect x="1" y="10" width="12" height="2" rx="1" fill="currentColor"/>
+      </svg>
+    </button>
+    <button class="view-btn" id="btnCard" onclick="setView('card')" title="Card Swipe">
+      <!-- card icon -->
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="1" width="10" height="12" rx="2" fill="currentColor"/>
+      </svg>
+    </button>
+  </div>
 </header>
 
 <div class="add-bar">
@@ -352,7 +655,22 @@
   <button class="btn" id="addBtn" onclick="quickAdd()">Add</button>
 </div>
 
-<div class="board" id="board"></div>
+<!-- Kanban view -->
+<div class="board" id="viewKanban"></div>
+
+<!-- List view -->
+<div class="list-view" id="viewList" style="display:none"></div>
+
+<!-- Card swipe view -->
+<div class="swipe-view" id="viewCard" style="display:none">
+  <div class="swipe-stage-tabs" id="swipeTabs"></div>
+  <div class="swipe-deck-wrap" id="swipeDeck">
+    <button class="swipe-nav prev" id="swipePrev" onclick="swipeNav(-1)">‹</button>
+    <div id="swipeCardEl" class="swipe-card"></div>
+    <button class="swipe-nav next" id="swipeNext" onclick="swipeNav(1)">›</button>
+  </div>
+  <div class="swipe-counter" id="swipeCounter"></div>
+</div>
 
 <!-- Edit modal -->
 <div class="overlay" id="overlay" onclick="closeModal(event)">
@@ -424,11 +742,33 @@ const TAG_LABELS = {
   education:  'Education',
 };
 
+// Tag gradient colors for card swipe hero (when no og:image)
+const TAG_GRADIENTS = {
+  brainrot:   'linear-gradient(135deg,#2d1b69,#4c1d95)',
+  training:   'linear-gradient(135deg,#1e3a5f,#1d4ed8)',
+  comp:       'linear-gradient(135deg,#4a3000,#92680a)',
+  highlight:  'linear-gradient(135deg,#1a3a2a,#065f46)',
+  education:  'linear-gradient(135deg,#143a1a,#166534)',
+};
+
+const TAG_EMOJI = {
+  brainrot:  '🤯',
+  training:  '🥋',
+  comp:      '🏆',
+  highlight: '✨',
+  education: '📚',
+};
+
 // ─── State ───────────────────────────────────────────────────────────────────
 let db = null;
-let cards = [];          // flat array, sorted by stage+position
+let cards = [];
 let dragId = null;
 let editingId = null;
+let currentView = localStorage.getItem('bjj-view') || 'kanban';
+let swipeStageFilter = 'all';
+let swipeIndex = 0;
+// Touch tracking for swipe
+let touchStartX = 0;
 
 // ─── Supabase ────────────────────────────────────────────────────────────────
 const configured = SUPABASE_URL !== '__SUPABASE_URL__';
@@ -438,10 +778,9 @@ if (configured) {
   load();
   subscribe();
 } else {
-  // Dev fallback: localStorage
   cards = JSON.parse(localStorage.getItem('bjj-cards') || '[]');
   render();
-  console.warn('Supabase not configured — using localStorage. Replace __SUPABASE_URL__ and __SUPABASE_ANON_KEY__ to connect.');
+  console.warn('Supabase not configured — using localStorage.');
 }
 
 async function load() {
@@ -468,6 +807,26 @@ function localSave() {
   if (!configured) localStorage.setItem('bjj-cards', JSON.stringify(cards));
 }
 
+// ─── View switcher ───────────────────────────────────────────────────────────
+function setView(v) {
+  currentView = v;
+  localStorage.setItem('bjj-view', v);
+  ['kanban','list','card'].forEach(name => {
+    const el = document.getElementById('view' + name.charAt(0).toUpperCase() + name.slice(1));
+    if (el) el.style.display = (name === v) ? (name === 'kanban' ? 'flex' : 'flex') : 'none';
+    document.getElementById('btn' + name.charAt(0).toUpperCase() + name.slice(1))
+      .classList.toggle('active', name === v);
+  });
+  // Adjust display type per view
+  document.getElementById('viewKanban').style.display = v === 'kanban' ? 'flex' : 'none';
+  document.getElementById('viewList').style.display   = v === 'list'   ? 'block' : 'none';
+  document.getElementById('viewCard').style.display   = v === 'card'   ? 'flex' : 'none';
+  render();
+}
+
+// initialise view on load
+setView(currentView);
+
 // ─── Quick add ───────────────────────────────────────────────────────────────
 async function quickAdd() {
   const input = document.getElementById('quickInput');
@@ -477,21 +836,25 @@ async function quickAdd() {
 
   const isURL = /^https?:\/\//i.test(raw);
   const card  = {
-    label:       isURL ? raw : raw,
+    label:       raw,
     description: null,
     link:        isURL ? raw : null,
     tag,
     stage:       'imagined',
     position:    nextPosition('imagined'),
+    og_image:    null,
   };
 
   if (isURL) {
-    // Attempt to pull a title via allorigins proxy (best-effort)
+    // Attempt to pull title + og:image via allorigins proxy (best-effort)
     try {
       const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(raw)}`);
       const j = await r.json();
-      const m = j.contents.match(/<title[^>]*>([^<]+)<\/title>/i);
-      if (m) card.label = m[1].trim().slice(0, 120);
+      const mTitle = j.contents.match(/<title[^>]*>([^<]+)<\/title>/i);
+      if (mTitle) card.label = mTitle[1].trim().slice(0, 120);
+      const mOg = j.contents.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+               ?? j.contents.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+      if (mOg) card.og_image = mOg[1].trim();
     } catch (_) { /* ignore */ }
   }
 
@@ -534,13 +897,13 @@ async function deleteCard(id) {
 function openEdit(id) {
   editingId = id;
   const c = cards.find(c => c.id === id);
-  document.getElementById('editLabel').value = c.label || '';
-  document.getElementById('editDesc').value  = c.description || '';
-  document.getElementById('editLink').value  = c.link  || '';
-  document.getElementById('editLink2').value = c.link2 || '';
-  document.getElementById('editLink3').value = c.link3 || '';
-  document.getElementById('editTag').value   = c.tag;
-  document.getElementById('editStage').value = c.stage;
+  document.getElementById('editLabel').value  = c.label || '';
+  document.getElementById('editDesc').value   = c.description || '';
+  document.getElementById('editLink').value   = c.link  || '';
+  document.getElementById('editLink2').value  = c.link2 || '';
+  document.getElementById('editLink3').value  = c.link3 || '';
+  document.getElementById('editTag').value    = c.tag;
+  document.getElementById('editStage').value  = c.stage;
   document.getElementById('overlay').classList.add('open');
   document.getElementById('editLabel').focus();
 }
@@ -609,7 +972,6 @@ async function onDrop(e, stage) {
 
   if (configured) {
     await db.from('cards').update({ stage, position: card.position }).eq('id', dragId);
-    // Reorder old column
     const oldCol = cards.filter(c => c.stage === oldStage).sort((a,b) => a.position - b.position);
     await Promise.all(oldCol.map((c, i) =>
       i !== c.position ? db.from('cards').update({ position: i }).eq('id', c.id) : Promise.resolve()
@@ -620,15 +982,44 @@ async function onDrop(e, stage) {
   render();
 }
 
-// ─── Render ──────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+function relDate(iso) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins  = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days  = Math.floor(diff / 86400000);
+  if (mins < 1)   return 'just now';
+  if (mins < 60)  return `${mins}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 30)  return `${days}d ago`;
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 function fmt(iso) {
   if (!iso) return '';
   const d = new Date(iso);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+// ─── Render (dispatch) ───────────────────────────────────────────────────────
 function render() {
-  const board = document.getElementById('board');
+  if (currentView === 'kanban') renderKanban();
+  else if (currentView === 'list') renderList();
+  else if (currentView === 'card') renderSwipe();
+}
+
+// ─── Kanban ──────────────────────────────────────────────────────────────────
+function renderKanban() {
+  const board = document.getElementById('viewKanban');
   board.innerHTML = '';
 
   for (const stage of STAGES) {
@@ -669,6 +1060,7 @@ function render() {
             <button class="icon-btn" onclick="openEdit('${c.id}')" title="Edit">✎</button>
             <button class="icon-btn danger" onclick="deleteCard('${c.id}')" title="Delete">✕</button>
           </div>
+          ${c.og_image ? `<img class="card-og-thumb" src="${esc(c.og_image)}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}
           <div class="card-label">${esc(c.label)}</div>
           ${c.description ? `<div class="card-desc">${esc(c.description)}</div>` : ''}
           ${c.link  ? `<a class="card-link" href="${esc(c.link)}"  target="_blank" rel="noopener">${esc(c.link)}</a>`  : ''}
@@ -688,13 +1080,157 @@ function render() {
   }
 }
 
-function esc(s) {
-  return String(s ?? '')
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;');
+// ─── List ────────────────────────────────────────────────────────────────────
+function renderList() {
+  const container = document.getElementById('viewList');
+  container.innerHTML = '';
+
+  for (const stage of STAGES) {
+    const stageCards = cards
+      .filter(c => c.stage === stage.key)
+      .sort((a, b) => a.position - b.position);
+
+    const group = document.createElement('div');
+    group.className = 'list-stage-group';
+
+    group.innerHTML = `<div class="list-stage-header">${stage.label} (${stageCards.length})</div>`;
+
+    if (stageCards.length === 0) {
+      group.innerHTML += `<div class="empty" style="padding:12px 6px">No cards</div>`;
+    } else {
+      for (const c of stageCards) {
+        const row = document.createElement('div');
+        row.className = 'list-row';
+
+        const thumb = c.og_image
+          ? `<img class="list-og-thumb" src="${esc(c.og_image)}" alt="" loading="lazy" onerror="this.outerHTML='<div class=list-og-placeholder></div>'">`
+          : `<div class="list-og-placeholder"></div>`;
+
+        row.innerHTML = `
+          ${thumb}
+          <div class="list-label" title="${esc(c.label)}">${esc(c.label)}</div>
+          <div class="list-meta">
+            <span class="tag tag-${c.tag}">${TAG_LABELS[c.tag] || c.tag}</span>
+            <span class="list-date">${relDate(c.created_at)}</span>
+            <div class="list-actions">
+              <button class="icon-btn" onclick="openEdit('${c.id}')" title="Edit">✎</button>
+              <button class="icon-btn danger" onclick="deleteCard('${c.id}')" title="Delete">✕</button>
+            </div>
+          </div>
+        `;
+        group.appendChild(row);
+      }
+    }
+
+    container.appendChild(group);
+  }
 }
+
+// ─── Card swipe ──────────────────────────────────────────────────────────────
+function getSwipeCards() {
+  const filtered = swipeStageFilter === 'all'
+    ? cards
+    : cards.filter(c => c.stage === swipeStageFilter);
+  return filtered.sort((a, b) => {
+    const si = s => STAGES.findIndex(x => x.key === s);
+    return si(a.stage) - si(b.stage) || a.position - b.position;
+  });
+}
+
+function renderSwipe() {
+  // Build stage tabs
+  const tabsEl = document.getElementById('swipeTabs');
+  tabsEl.innerHTML = '';
+
+  const allBtn = document.createElement('button');
+  allBtn.className = 'swipe-tab' + (swipeStageFilter === 'all' ? ' active' : '');
+  allBtn.textContent = `All (${cards.length})`;
+  allBtn.onclick = () => { swipeStageFilter = 'all'; swipeIndex = 0; renderSwipe(); };
+  tabsEl.appendChild(allBtn);
+
+  for (const stage of STAGES) {
+    const count = cards.filter(c => c.stage === stage.key).length;
+    const btn = document.createElement('button');
+    btn.className = 'swipe-tab' + (swipeStageFilter === stage.key ? ' active' : '');
+    btn.textContent = `${stage.label} (${count})`;
+    btn.onclick = () => { swipeStageFilter = stage.key; swipeIndex = 0; renderSwipe(); };
+    tabsEl.appendChild(btn);
+  }
+
+  // Render card
+  const deck = getSwipeCards();
+  const cardEl = document.getElementById('swipeCardEl');
+  const counter = document.getElementById('swipeCounter');
+  const prevBtn = document.getElementById('swipePrev');
+  const nextBtn = document.getElementById('swipeNext');
+
+  if (swipeIndex >= deck.length) swipeIndex = Math.max(0, deck.length - 1);
+
+  if (deck.length === 0) {
+    cardEl.innerHTML = '<div class="swipe-body"><div class="empty">No cards in this stage.</div></div>';
+    counter.textContent = '';
+    prevBtn.disabled = true;
+    nextBtn.disabled = true;
+    return;
+  }
+
+  prevBtn.disabled = swipeIndex === 0;
+  nextBtn.disabled = swipeIndex === deck.length - 1;
+  counter.textContent = `${swipeIndex + 1} / ${deck.length}`;
+
+  const c = deck[swipeIndex];
+  const links = [c.link, c.link2, c.link3].filter(Boolean);
+
+  const hero = c.og_image
+    ? `<img class="swipe-hero" src="${esc(c.og_image)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+    : `<div class="swipe-hero-gradient" style="background:${TAG_GRADIENTS[c.tag] || TAG_GRADIENTS.brainrot}">${TAG_EMOJI[c.tag] || '🎬'}</div>`;
+
+  const linksHtml = links.length
+    ? `<div class="swipe-links">${links.map(l =>
+        `<a class="swipe-link-chip" href="${esc(l)}" target="_blank" rel="noopener">${esc(l)}</a>`
+      ).join('')}</div>`
+    : '';
+
+  cardEl.innerHTML = `
+    ${hero}
+    <div class="swipe-body">
+      <div class="swipe-label">${esc(c.label)}</div>
+      ${c.description ? `<div class="swipe-desc">${esc(c.description)}</div>` : ''}
+      ${linksHtml}
+      <div class="swipe-footer">
+        <span class="tag tag-${c.tag}">${TAG_LABELS[c.tag] || c.tag}</span>
+        <span class="stage-badge">${c.stage}</span>
+        <span class="card-date" style="margin-left:auto">${relDate(c.created_at)}</span>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:12px;justify-content:flex-end">
+        <button class="icon-btn" onclick="openEdit('${c.id}')" title="Edit">✎</button>
+        <button class="icon-btn danger" onclick="deleteCard('${c.id}')" title="Delete">✕</button>
+      </div>
+    </div>
+  `;
+
+  // Touch swipe events
+  cardEl.ontouchstart = e => { touchStartX = e.touches[0].clientX; };
+  cardEl.ontouchend   = e => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 40) swipeNav(dx < 0 ? 1 : -1);
+  };
+}
+
+function swipeNav(dir) {
+  const deck = getSwipeCards();
+  const next = swipeIndex + dir;
+  if (next < 0 || next >= deck.length) return;
+  swipeIndex = next;
+  renderSwipe();
+}
+
+// Keyboard arrow navigation for swipe view
+document.addEventListener('keydown', e => {
+  if (currentView !== 'card') return;
+  if (e.key === 'ArrowRight') swipeNav(1);
+  if (e.key === 'ArrowLeft')  swipeNav(-1);
+});
 </script>
 </body>
 </html>
